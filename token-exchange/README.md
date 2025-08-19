@@ -4,7 +4,7 @@ With this script an access token can be requested at an OAuth Identity Provider 
 ## Example usage
 
 ```bash
-./token-exchange/token-exchange.sh <access-token> <client-id> <token url> <private key> <target audience> 
+./token-exchange.sh <access-token> <client-id> <token url> <private key> <target audience> 
 ```
 
 - access token: The token to exchange
