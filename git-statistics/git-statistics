@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: $0 /path/to/repo1 /path/to/repo2 ..."
+  exit 1
+fi
+
+SINCE_DATE=$(date -v-1y +"%Y-%m-%d")
+TOTAL_COMMITS=0
+TOTAL_RELEASES=0
+
+echo "Stats since $SINCE_DATE"
+echo "----------------------------------------------------"
+
+for repo in "$@"; do
+  if [ ! -d "$repo/.git" ]; then
+    echo "$(basename "$repo"): NOT A GIT REPO"
+    continue
+  fi
+
+  cd "$repo" || continue
+  repo_name=$(basename "$repo")
+
+  # Count commits
+  commit_count=$(git log --since="$SINCE_DATE" --oneline | wc -l | tr -d ' ')
+
+  # Count tags (releases) by creation date
+  release_count=$(git for-each-ref \
+    --sort=creatordate \
+    --format '%(creatordate:short)' \
+    refs/tags \
+    | awk -v since="$SINCE_DATE" '$1 >= since' \
+    | wc -l \
+    | tr -d ' ')
+
+  printf "%-30s Commits: %-5s Releases: %-5s\n" \
+    "$repo_name" "$commit_count" "$release_count"
+
+  TOTAL_COMMITS=$((TOTAL_COMMITS + commit_count))
+  TOTAL_RELEASES=$((TOTAL_RELEASES + release_count))
+done
+
+echo "----------------------------------------------------"
+echo "TOTAL commits : $TOTAL_COMMITS"
+echo "TOTAL releases: $TOTAL_RELEASES"

@@ -1,2 +1,4 @@
 token-exchange/certs
 client-credentials-grant/certs
+.idea
+.DS_Store
