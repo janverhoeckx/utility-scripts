@@ -2,7 +2,8 @@
 
 # === Usage ===
 if [ $# -lt 4 ]; then
-  echo "Usage: $0 <client_id> <token_url> <private_key> <audience> [scope]"
+  echo "Usage: $0 <client_id> <token_url> <private_key> <audience> [scope] [algorithm]"
+  echo "  algorithm: RS256 (default), RS384 or RS512"
   exit 1
 fi
 
@@ -11,9 +12,20 @@ TOKEN_URL="$2"
 PRIVATE_KEY="$3"
 AUDIENCE="$4"
 SCOPE="$5"
+ALGORITHM="${6:-RS256}"
+
+case "$ALGORITHM" in
+  RS256) DIGEST="sha256" ;;
+  RS384) DIGEST="sha384" ;;
+  RS512) DIGEST="sha512" ;;
+  *)
+    echo "Unsupported algorithm: $ALGORITHM (use RS256, RS384 or RS512)"
+    exit 1
+    ;;
+esac
 
 # === Create client_assertion JWT ===
-HEADER='{"alg":"RS256","typ":"JWT"}'
+HEADER='{"alg":"'"$ALGORITHM"'","typ":"JWT"}'
 
 PAYLOAD=$(cat <<EOF
 {
@@ -37,7 +49,7 @@ SIGN_INPUT="${HEADER_B64}.${PAYLOAD_B64}"
 
 # Sign with private key
 SIGNATURE=$(echo -n "$SIGN_INPUT" | \
-  openssl dgst -sha256 -sign "$PRIVATE_KEY" | \
+  openssl dgst -"$DIGEST" -sign "$PRIVATE_KEY" | \
   openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
 
 JWT="${SIGN_INPUT}.${SIGNATURE}"
