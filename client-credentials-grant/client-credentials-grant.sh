@@ -27,13 +27,16 @@ esac
 # === Create client_assertion JWT ===
 HEADER='{"alg":"'"$ALGORITHM"'","typ":"JWT"}'
 
+NOW=$(date +%s)
+
 PAYLOAD=$(cat <<EOF
 {
   "iss": "$CLIENT_ID",
   "sub": "$CLIENT_ID",
   "aud": "$AUDIENCE",
   "jti": "$(uuidgen)",
-  "exp": $(($(date +%s)+300))
+  "iat": $NOW,
+  "exp": $((NOW+60))
 }
 EOF
 )

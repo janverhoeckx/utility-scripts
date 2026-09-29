@@ -15,7 +15,7 @@ A collection of standalone Bash utility scripts, one per directory, each with it
 
 ## Shared patterns
 
-- Both OAuth scripts build and sign the client-assertion JWT by hand (no JWT library): base64url via `openssl base64 | tr '+/' '-_' | tr -d '='`, signed with `openssl dgst -<digest> -sign <pem>`, claims `iss`/`sub` = client id, `aud`, a `uuidgen` `jti`, and `exp` = now + 300s. The logic is duplicated per script rather than shared, so a fix in one (like the algorithm option added to client-credentials-grant) usually needs porting to the other.
+- Both OAuth scripts build and sign the client-assertion JWT by hand (no JWT library): base64url via `openssl base64 | tr '+/' '-_' | tr -d '='`, signed with `openssl dgst -<digest> -sign <pem>`, claims `iss`/`sub` = client id, `aud`, a `uuidgen` `jti`, `iat` = now and `exp` = now + 60s (Keycloak rejects assertions without `iat` whose `exp` exceeds its max lifetime). The logic is duplicated per script rather than shared, so a fix in one (like the algorithm option added to client-credentials-grant) usually needs porting to the other.
 - Dependencies: `openssl`, `uuidgen`, `curl`, `jq`; the SQS poller also needs a configured `aws` CLI.
 
 ## Local-only files
