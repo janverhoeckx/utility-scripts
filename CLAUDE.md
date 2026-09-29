@@ -9,7 +9,7 @@ A collection of standalone Bash utility scripts, one per directory, each with it
 ## Scripts
 
 - `client-credentials-grant/` — OAuth client credentials grant, authenticating with a signed client-assertion JWT. Supports RS256/RS384/RS512 via an optional 6th argument.
-- `token-exchange/` — OAuth token exchange (RFC 8693) with a client-assertion JWT. RS256 only. Takes 6 positional args (subject token, client id, token url, private key, audience, target audience); the usage guard in the script only checks for 4.
+- `token-exchange/` — OAuth token exchange (RFC 8693) with a client-assertion JWT. RS256 only. Takes 6 required positional args: subject token, client id, token url, private key, audience (for the client assertion) and target audience (for the exchanged token).
 - `sqs-poller/` — Long-polls an AWS SQS queue via the AWS CLI, appends each message (body parsed as JSON when possible) to a JSON array file, and **deletes each message from the queue after saving it**.
 - `git-statistics/git-statistics` — Commit and tag counts over the last year for a list of repo paths. Uses BSD `date -v-1y`, so it only works on macOS as written.
 
@@ -20,4 +20,4 @@ A collection of standalone Bash utility scripts, one per directory, each with it
 
 ## Local-only files
 
-`*/certs/` (private keys used for testing) and `.idea`/`.DS_Store` are gitignored. Poller output files like `sqs-poller/*.json` are untracked local data and can contain real message contents, so don't commit them.
+`*/certs/` (private keys used for testing), `.idea` and `.DS_Store` are gitignored. Poller output files like `sqs-poller/*.json` are untracked local data and can contain real message contents, so don't commit them.

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # === Usage ===
-if [ $# -lt 4 ]; then
-  echo "Usage: $0 <subject_token> <client_id> <token_url> <private_key> [audience]"
+if [ $# -lt 6 ]; then
+  echo "Usage: $0 <subject_token> <client_id> <token_url> <private_key> <audience> <target_audience>"
   exit 1
 fi
 
@@ -10,8 +10,8 @@ SUBJECT_TOKEN="$1"
 CLIENT_ID="$2"
 TOKEN_URL="$3"
 PRIVATE_KEY="$4"
-AUDIENCE="$5"   
-TARGET_AUDIENCE="$6" 
+AUDIENCE="$5"
+TARGET_AUDIENCE="$6"
 
 # === Create client_assertion JWT ===
 HEADER='{"alg":"RS256","typ":"JWT"}'
