@@ -14,6 +14,8 @@ With this script an access token can be requested at an OAuth Identity Provider 
 - scope: Optional scope parameter for the access token request
 - algorithm: Optional signature algorithm for the client assertion JWT: RS256 (default), RS384 or RS512
 
+A browser version of this tool is hosted at https://janverhoeckx.github.io/utility-scripts/oauth.html (see [docs/README.md](../docs/README.md)).
+
 ## Notes
 
 - The script generates a JWT for client assertion using the RS256 algorithm by default; pass RS384 or RS512 as the sixth argument to match the Identity Provider's configuration

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="data:,">
+<title>Utility Tools</title>
+<style>
+  :root { --bg: #f7f7f8; --fg: #1d1d1f; --muted: #6b6b72; --card: #fff; --border: #d9d9de; --accent: #2458d6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151518; --fg: #e8e8ea; --muted: #9a9aa3; --card: #1f1f23; --border: #34343a; --accent: #6d95ff; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 1.4rem; }
+  a.tool { display: block; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; color: inherit; text-decoration: none; }
+  a.tool strong { color: var(--accent); }
+  p { color: var(--muted); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Utility Tools</h1>
+  <a class="tool" href="oauth.html">
+    <strong>OAuth Client Assertion</strong><br>
+    Client Credentials and Token Exchange grants with a client assertion signed in your browser.
+  </a>
+  <p>Bash versions and more scripts: <a href="https://github.com/janverhoeckx/utility-scripts">github.com/janverhoeckx/utility-scripts</a></p>
+</main>
+</body>
+</html>
