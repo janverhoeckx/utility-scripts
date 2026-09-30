@@ -2,7 +2,8 @@
 
 # === Usage ===
 if [ $# -lt 6 ]; then
-  echo "Usage: $0 <subject_token> <client_id> <token_url> <private_key> <audience> <target_audience>"
+  echo "Usage: $0 <subject_token> <client_id> <token_url> <private_key> <audience> <target_audience> [algorithm]"
+  echo "  algorithm: RS256 (default), RS384 or RS512"
   exit 1
 fi
 
@@ -12,9 +13,20 @@ TOKEN_URL="$3"
 PRIVATE_KEY="$4"
 AUDIENCE="$5"
 TARGET_AUDIENCE="$6"
+ALGORITHM="${7:-RS256}"
+
+case "$ALGORITHM" in
+  RS256) DIGEST="sha256" ;;
+  RS384) DIGEST="sha384" ;;
+  RS512) DIGEST="sha512" ;;
+  *)
+    echo "Unsupported algorithm: $ALGORITHM (use RS256, RS384 or RS512)"
+    exit 1
+    ;;
+esac
 
 # === Create client_assertion JWT ===
-HEADER='{"alg":"RS256","typ":"JWT"}'
+HEADER='{"alg":"'"$ALGORITHM"'","typ":"JWT"}'
 
 NOW=$(date +%s)
 
@@ -41,7 +53,7 @@ SIGN_INPUT="${HEADER_B64}.${PAYLOAD_B64}"
 
 # Sign with private key
 SIGNATURE=$(echo -n "$SIGN_INPUT" | \
-  openssl dgst -sha256 -sign "$PRIVATE_KEY" | \
+  openssl dgst -"$DIGEST" -sign "$PRIVATE_KEY" | \
   openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
 
 JWT="${SIGN_INPUT}.${SIGNATURE}"

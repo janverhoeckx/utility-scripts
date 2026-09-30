@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:,">
+<title>OAuth Client Assertion</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --fg: #1d1d1f; --muted: #6b6b72; --card: #fff; --border: #d9d9de;
+    --accent: #2458d6; --accent-fg: #fff; --error: #b3261e; --ok: #1f7a3a; --code: #f0f0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151518; --fg: #e8e8ea; --muted: #9a9aa3; --card: #1f1f23; --border: #34343a;
+      --accent: #6d95ff; --accent-fg: #0b0b0d; --error: #ff8a80; --ok: #7bd88f; --code: #2a2a30;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  label small { font-weight: 400; color: var(--muted); }
+  input, select, textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; }
+  textarea { font-family: ui-monospace, monospace; font-size: 13px; min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .row > input, .row > select { flex: 1 1 180px; width: auto; }
+  .grant { display: flex; gap: 16px; flex-wrap: wrap; }
+  .grant label { display: flex; gap: 6px; align-items: center; font-weight: 400; margin: 0; }
+  .grant input { width: auto; }
+  button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+  pre { background: var(--code); border-radius: 6px; padding: 10px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; font-size: 13px; margin: 8px 0 0; }
+  .status { margin-top: 8px; }
+  .error { color: var(--error); }
+  .ok { color: var(--ok); }
+  .muted { color: var(--muted); font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>OAuth Client Assertion</h1>
+  <p class="lead">Requests a token with a client assertion signed in this browser. The private key never leaves this page and is never stored.</p>
+
+  <section>
+    <h2>Profile</h2>
+    <div class="row">
+      <select id="profile-select" aria-label="Saved profiles"><option value="">— no profile —</option></select>
+      <button type="button" id="profile-delete">Delete</button>
+    </div>
+    <div class="row">
+      <input id="profile-name" placeholder="Profile name, e.g. medicatie-acc" aria-label="Profile name">
+      <button type="button" id="profile-save">Save</button>
+    </div>
+    <div class="row">
+      <button type="button" id="profile-export">Export</button>
+      <button type="button" id="profile-import">Import</button>
+      <input type="file" id="profile-import-file" accept="application/json,.json" hidden>
+      <span class="muted">Profiles hold only client id, URLs, audiences, scope and algorithm.</span>
+    </div>
+    <div id="profile-status" class="status muted"></div>
+  </section>
+
+  <section>
+    <h2>Request</h2>
+    <div class="grant" role="radiogroup" aria-label="Grant">
+      <label><input type="radio" name="grant" value="client_credentials" checked> Client Credentials</label>
+      <label><input type="radio" name="grant" value="token_exchange"> Token Exchange</label>
+    </div>
+
+    <label for="client-id">Client id</label>
+    <input id="client-id" autocomplete="off" spellcheck="false">
+
+    <label for="token-url">Token url</label>
+    <input id="token-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://…/realms/…/protocol/openid-connect/token">
+
+    <label for="audience">Audience <small>— the client assertion's aud, typically the Identity Provider</small></label>
+    <input id="audience" autocomplete="off" spellcheck="false">
+
+    <div data-grant="client_credentials">
+      <label for="scope">Scope <small>— optional</small></label>
+      <input id="scope" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div data-grant="token_exchange" hidden>
+      <label for="target-audience">Target audience <small>— the service that will receive the token</small></label>
+      <input id="target-audience" autocomplete="off" spellcheck="false">
+
+      <label for="subject-token">Subject token</label>
+      <textarea id="subject-token" autocomplete="off" spellcheck="false"></textarea>
+    </div>
+
+    <label for="algorithm">Algorithm</label>
+    <select id="algorithm">
+      <option>RS256</option>
+      <option>RS384</option>
+      <option>RS512</option>
+    </select>
+
+    <label for="private-key">Private key <small>— PKCS#8 PEM (BEGIN PRIVATE KEY), not stored</small></label>
+    <textarea id="private-key" autocomplete="off" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+    <div class="row">
+      <input type="file" id="private-key-file" accept=".pem,.key,.p8,text/plain" aria-label="Load private key from file">
+    </div>
+
+    <div class="row">
+      <button type="button" class="primary" id="send">Request token</button>
+      <button type="button" id="copy-curl">Copy as curl</button>
+    </div>
+    <div id="request-status" class="status"></div>
+  </section>
+
+  <section id="curl-section" hidden>
+    <h2>curl</h2>
+    <p class="muted">Run this within the countdown — the client assertion expires 60 seconds after signing. Starts with a space so zsh/bash can keep it out of history.</p>
+    <pre id="curl-command"></pre>
+    <div class="row">
+      <button type="button" id="curl-resign">Re-sign and copy</button>
+      <span id="curl-countdown"></span>
+    </div>
+  </section>
+
+  <section id="result-section" hidden>
+    <h2>Response</h2>
+    <div id="response-status" class="status"></div>
+    <pre id="response-body"></pre>
+    <div class="row">
+      <button type="button" id="use-as-subject" hidden>Use as subject token</button>
+    </div>
+    <div id="access-token-section" hidden>
+      <h2 style="margin-top:16px">Decoded access token</h2>
+      <pre id="access-token-decoded"></pre>
+    </div>
+  </section>
+
+  <section id="assertion-section" hidden>
+    <h2>Client assertion sent</h2>
+    <pre id="assertion-decoded"></pre>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const PROFILES_KEY = 'oauth-profiles';
+  const PROFILE_FIELDS = ['grant', 'clientId', 'tokenUrl', 'audience', 'targetAudience', 'scope', 'algorithm'];
+  const ALGORITHMS = { RS256: 'SHA-256', RS384: 'SHA-384', RS512: 'SHA-512' };
+  const ASSERTION_LIFETIME_SECONDS = 60;
+
+  const fields = {
+    clientId: $('client-id'),
+    tokenUrl: $('token-url'),
+    audience: $('audience'),
+    targetAudience: $('target-audience'),
+    scope: $('scope'),
+    algorithm: $('algorithm'),
+  };
+
+  const selectedGrant = () => document.querySelector('input[name=grant]:checked').value;
+
+  function setGrant(grant) {
+    const radio = document.querySelector(`input[name=grant][value="${grant}"]`);
+    if (!radio) return;
+    radio.checked = true;
+    showGrantFields();
+  }
+
+  function showGrantFields() {
+    const grant = selectedGrant();
+    document.querySelectorAll('[data-grant]').forEach((el) => { el.hidden = el.dataset.grant !== grant; });
+  }
+
+  function setStatus(el, text, kind) {
+    el.textContent = text;
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  // --- JWT ---
+
+  const utf8 = new TextEncoder();
+
+  function base64UrlEncode(bytes) {
+    let binary = '';
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function base64UrlDecode(text) {
+    const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64 + '='.repeat((4 - base64.length % 4) % 4));
+    return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+  }
+
+  function pemToDer(pem) {
+    if (/BEGIN RSA PRIVATE KEY/.test(pem)) {
+      throw new Error('This is a PKCS#1 key. Convert it with: openssl pkcs8 -topk8 -nocrypt -in key.pem -out key.p8.pem');
+    }
+    if (/BEGIN ENCRYPTED PRIVATE KEY/.test(pem)) {
+      throw new Error('Encrypted keys are not supported. Decrypt it with: openssl pkcs8 -in key.pem -out key.p8.pem');
+    }
+    const match = pem.match(/-----BEGIN PRIVATE KEY-----([\s\S]+?)-----END PRIVATE KEY-----/);
+    if (!match) throw new Error('No PKCS#8 private key (-----BEGIN PRIVATE KEY-----) found.');
+    try {
+      return Uint8Array.from(atob(match[1].replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+    } catch {
+      throw new Error('The private key is not valid base64.');
+    }
+  }
+
+  async function signJwt(header, payload, pem, algorithm) {
+    const der = pemToDer(pem);
+    let key;
+    try {
+      key = await crypto.subtle.importKey(
+        'pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: ALGORITHMS[algorithm] }, false, ['sign']);
+    } catch (e) {
+      throw new Error('The private key could not be imported as an RSA key: ' + e.message);
+    }
+    const signingInput = base64UrlEncode(utf8.encode(JSON.stringify(header))) + '.' +
+      base64UrlEncode(utf8.encode(JSON.stringify(payload)));
+    const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, utf8.encode(signingInput));
+    return signingInput + '.' + base64UrlEncode(new Uint8Array(signature));
+  }
+
+  async function createClientAssertion(input) {
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: input.clientId,
+      sub: input.clientId,
+      aud: input.audience,
+      jti: crypto.randomUUID(),
+      iat: now,
+      exp: now + ASSERTION_LIFETIME_SECONDS,
+    };
+    return signJwt({ alg: input.algorithm, typ: 'JWT' }, payload, input.privateKey, input.algorithm);
+  }
+
+  function decodeJwt(token) {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      return { header: JSON.parse(base64UrlDecode(parts[0])), payload: JSON.parse(base64UrlDecode(parts[1])) };
+    } catch {
+      return null;
+    }
+  }
+
+  function describeJwt(decoded) {
+    const lines = [
+      'Header:', JSON.stringify(decoded.header, null, 2), '',
+      'Payload:', JSON.stringify(decoded.payload, null, 2),
+    ];
+    const times = ['iat', 'nbf', 'exp'].filter((c) => typeof decoded.payload[c] === 'number');
+    if (times.length) {
+      lines.push('');
+      for (const claim of times) lines.push(`${claim}: ${new Date(decoded.payload[claim] * 1000).toLocaleString()}`);
+    }
+    return lines.join('\n');
+  }
+
+  // --- Request ---
+
+  function readInput() {
+    const input = {
+      grant: selectedGrant(),
+      clientId: fields.clientId.value.trim(),
+      tokenUrl: fields.tokenUrl.value.trim(),
+      audience: fields.audience.value.trim(),
+      targetAudience: fields.targetAudience.value.trim(),
+      scope: fields.scope.value.trim(),
+      algorithm: fields.algorithm.value,
+      subjectToken: $('subject-token').value.trim(),
+      privateKey: $('private-key').value,
+    };
+    const missing = [];
+    if (!input.clientId) missing.push('client id');
+    if (!input.tokenUrl) missing.push('token url');
+    if (!input.audience) missing.push('audience');
+    if (!input.privateKey.trim()) missing.push('private key');
+    if (input.grant === 'token_exchange') {
+      if (!input.targetAudience) missing.push('target audience');
+      if (!input.subjectToken) missing.push('subject token');
+    }
+    if (missing.length) throw new Error('Missing: ' + missing.join(', '));
+    if (!/^https:\/\//i.test(input.tokenUrl)) throw new Error('Token url must start with https://');
+    return input;
+  }
+
+  function formParameters(input, assertion) {
+    const params = input.grant === 'token_exchange'
+      ? [
+          ['grant_type', 'urn:ietf:params:oauth:grant-type:token-exchange'],
+          ['subject_token', input.subjectToken],
+          ['audience', input.targetAudience],
+          ['client_id', input.clientId],
+          ['requested_token_type', 'urn:ietf:params:oauth:token-type:access_token'],
+        ]
+      : [
+          ['grant_type', 'client_credentials'],
+          ['client_id', input.clientId],
+        ];
+    params.push(['client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer']);
+    params.push(['client_assertion', assertion]);
+    if (input.grant === 'client_credentials' && input.scope) params.push(['scope', input.scope]);
+    return params;
+  }
+
+  function showAssertion(assertion) {
+    $('assertion-decoded').textContent = assertion + '\n\n' + describeJwt(decodeJwt(assertion));
+    $('assertion-section').hidden = false;
+  }
+
+  let lastAccessToken = null;
+
+  function showResponse(status, text) {
+    $('result-section').hidden = false;
+    setStatus($('response-status'), `HTTP ${status}`, status >= 200 && status < 300 ? 'ok' : 'error');
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* non-JSON body is shown as-is */ }
+    $('response-body').textContent = json ? JSON.stringify(json, null, 2) : text;
+
+    const accessToken = json && typeof json.access_token === 'string' ? json.access_token : null;
+    const decoded = accessToken && decodeJwt(accessToken);
+    lastAccessToken = accessToken;
+    $('use-as-subject').hidden = !accessToken;
+    $('access-token-section').hidden = !decoded;
+    $('access-token-decoded').textContent = decoded ? describeJwt(decoded) : '';
+  }
+
+  async function sendRequest() {
+    const status = $('request-status');
+    let input, assertion;
+    try {
+      input = readInput();
+      assertion = await createClientAssertion(input);
+    } catch (e) {
+      setStatus(status, e.message, 'error');
+      return;
+    }
+    showAssertion(assertion);
+    setStatus(status, 'Requesting…');
+    try {
+      const response = await fetch(input.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(formParameters(input, assertion)),
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
+      showResponse(response.status, await response.text());
+      setStatus(status, '');
+    } catch {
+      // Browsers report a CORS rejection as an opaque network error, so both cases fall back to curl.
+      setStatus(status, `The browser could not reach the token url — most likely CORS: add ${location.origin} to the client's Web Origins in Keycloak. Use the curl command below instead.`, 'error');
+      await copyCurl();
+    }
+  }
+
+  // --- curl fallback ---
+
+  const shellQuote = (value) => "'" + value.replace(/'/g, `'\\''`) + "'";
+
+  function curlCommand(input, assertion) {
+    const lines = [` curl -s -X POST ${shellQuote(input.tokenUrl)}`, `-H 'Content-Type: application/x-www-form-urlencoded'`];
+    for (const [name, value] of formParameters(input, assertion)) lines.push(`--data-urlencode ${shellQuote(name + '=' + value)}`);
+    return lines.join(' \\\n  ') + ' | jq .';
+  }
+
+  let countdownTimer = null;
+
+  function startCountdown(expiresAt) {
+    clearInterval(countdownTimer);
+    const el = $('curl-countdown');
+    const tick = () => {
+      const left = Math.round((expiresAt - Date.now()) / 1000);
+      if (left > 0) {
+        setStatus(el, `Assertion expires in ${left}s`, 'ok');
+      } else {
+        setStatus(el, 'Assertion expired — re-sign before running', 'error');
+        clearInterval(countdownTimer);
+      }
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  async function copyCurl() {
+    const status = $('request-status');
+    let input, assertion;
+    try {
+      input = readInput();
+      assertion = await createClientAssertion(input);
+    } catch (e) {
+      setStatus(status, e.message, 'error');
+      return;
+    }
+    showAssertion(assertion);
+    const command = curlCommand(input, assertion);
+    $('curl-command').textContent = command;
+    $('curl-section').hidden = false;
+    startCountdown(decodeJwt(assertion).payload.exp * 1000);
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      setStatus($('curl-countdown'), 'Could not copy to the clipboard — select the command manually', 'error');
+    }
+  }
+
+  // --- Profiles ---
+
+  function loadProfiles() {
+    try {
+      return sanitizeProfiles(JSON.parse(localStorage.getItem(PROFILES_KEY) || '{}'));
+    } catch {
+      return {};
+    }
+  }
+
+  function storeProfiles(profiles) {
+    try {
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+      return true;
+    } catch {
+      setStatus($('profile-status'), 'This browser does not allow saving profiles.', 'error');
+      return false;
+    }
+  }
+
+  function sanitizeProfiles(value) {
+    const profiles = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return profiles;
+    for (const [name, raw] of Object.entries(value)) {
+      if (!name.trim() || !raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+      const profile = {};
+      for (const field of PROFILE_FIELDS) {
+        if (typeof raw[field] === 'string') profile[field] = raw[field];
+      }
+      if (profile.grant && !['client_credentials', 'token_exchange'].includes(profile.grant)) delete profile.grant;
+      if (profile.algorithm && !ALGORITHMS[profile.algorithm]) delete profile.algorithm;
+      profiles[name] = profile;
+    }
+    return profiles;
+  }
+
+  function renderProfiles(selected) {
+    const select = $('profile-select');
+    select.replaceChildren(new Option('— no profile —', ''));
+    for (const name of Object.keys(loadProfiles()).sort()) select.add(new Option(name, name));
+    select.value = selected && loadProfiles()[selected] ? selected : '';
+  }
+
+  function applyProfile(name) {
+    const profile = loadProfiles()[name];
+    if (!profile) return;
+    setGrant(profile.grant || 'client_credentials');
+    for (const [field, el] of Object.entries(fields)) {
+      el.value = profile[field] ?? (field === 'algorithm' ? 'RS256' : '');
+    }
+    $('profile-name').value = name;
+  }
+
+  function saveProfile() {
+    const name = $('profile-name').value.trim();
+    if (!name) {
+      setStatus($('profile-status'), 'Enter a profile name first.', 'error');
+      return;
+    }
+    const profiles = loadProfiles();
+    profiles[name] = { grant: selectedGrant() };
+    for (const [field, el] of Object.entries(fields)) profiles[name][field] = el.value.trim();
+    if (storeProfiles(profiles)) {
+      renderProfiles(name);
+      setStatus($('profile-status'), `Saved "${name}".`, 'ok');
+    }
+  }
+
+  function deleteProfile() {
+    const name = $('profile-select').value;
+    if (!name) return;
+    const profiles = loadProfiles();
+    delete profiles[name];
+    if (storeProfiles(profiles)) {
+      renderProfiles('');
+      setStatus($('profile-status'), `Deleted "${name}".`, 'ok');
+    }
+  }
+
+  function exportProfiles() {
+    const blob = new Blob([JSON.stringify(loadProfiles(), null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'oauth-profiles.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  async function importProfiles(file) {
+    const status = $('profile-status');
+    let imported;
+    try {
+      imported = sanitizeProfiles(JSON.parse(await file.text()));
+    } catch {
+      setStatus(status, 'That file is not valid JSON.', 'error');
+      return;
+    }
+    const count = Object.keys(imported).length;
+    if (!count) {
+      setStatus(status, 'No profiles found in that file.', 'error');
+      return;
+    }
+    if (storeProfiles({ ...loadProfiles(), ...imported })) {
+      renderProfiles($('profile-select').value);
+      setStatus(status, `Imported ${count} profile(s).`, 'ok');
+    }
+  }
+
+  // --- Wiring ---
+
+  document.querySelectorAll('input[name=grant]').forEach((radio) => radio.addEventListener('change', showGrantFields));
+  $('send').addEventListener('click', sendRequest);
+  $('copy-curl').addEventListener('click', copyCurl);
+  $('curl-resign').addEventListener('click', copyCurl);
+  $('use-as-subject').addEventListener('click', () => {
+    if (!lastAccessToken) return;
+    $('subject-token').value = lastAccessToken;
+    setGrant('token_exchange');
+    $('target-audience').focus();
+  });
+  $('private-key-file').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (file) $('private-key').value = await file.text();
+    event.target.value = '';
+  });
+  $('profile-select').addEventListener('change', (event) => applyProfile(event.target.value));
+  $('profile-save').addEventListener('click', saveProfile);
+  $('profile-delete').addEventListener('click', deleteProfile);
+  $('profile-export').addEventListener('click', exportProfiles);
+  $('profile-import').addEventListener('click', () => $('profile-import-file').click());
+  $('profile-import-file').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) importProfiles(file);
+    event.target.value = '';
+  });
+
+  renderProfiles('');
+  showGrantFields();
+})();
+</script>
+</body>
+</html>
