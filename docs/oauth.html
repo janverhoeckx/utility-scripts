@@ -34,6 +34,8 @@
   .grant { display: flex; gap: 16px; flex-wrap: wrap; }
   .grant label { display: flex; gap: 6px; align-items: center; font-weight: 400; margin: 0; }
   .grant input { width: auto; }
+  label.check { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  label.check input { width: auto; }
   button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
   button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
   pre { background: var(--code); border-radius: 6px; padding: 10px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; font-size: 13px; margin: 8px 0 0; }
@@ -47,7 +49,7 @@
 <body>
 <main>
   <h1>OAuth Client Assertion</h1>
-  <p class="lead">Requests a token with a client assertion signed in this browser. The private key never leaves this page and is never stored.</p>
+  <p class="lead">Requests a token with a client assertion signed in this browser. The private key never leaves this browser and is only stored when you choose to save it with a profile.</p>
 
   <section>
     <h2>Profile</h2>
@@ -63,7 +65,7 @@
       <button type="button" id="profile-export">Export</button>
       <button type="button" id="profile-import">Import</button>
       <input type="file" id="profile-import-file" accept="application/json,.json" hidden>
-      <span class="muted">Profiles hold only client id, URLs, audiences, scope and algorithm.</span>
+      <span class="muted">Profiles hold client id, URLs, audiences, scope, algorithm and, if checked, the private key. Exports never include private keys.</span>
     </div>
     <div id="profile-status" class="status muted"></div>
   </section>
@@ -104,11 +106,12 @@
       <option>RS512</option>
     </select>
 
-    <label for="private-key">Private key <small>— PKCS#8 PEM (BEGIN PRIVATE KEY), not stored</small></label>
+    <label for="private-key">Private key <small>— PKCS#8 PEM (BEGIN PRIVATE KEY)</small></label>
     <textarea id="private-key" autocomplete="off" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
     <div class="row">
       <input type="file" id="private-key-file" accept=".pem,.key,.p8,text/plain" aria-label="Load private key from file">
     </div>
+    <label class="check"><input type="checkbox" id="store-private-key"> Save private key with the profile <small>— stored unencrypted in this browser's localStorage</small></label>
 
     <div class="row">
       <button type="button" class="primary" id="send">Request token</button>
@@ -444,6 +447,7 @@
       }
       if (profile.grant && !['client_credentials', 'token_exchange'].includes(profile.grant)) delete profile.grant;
       if (profile.algorithm && !ALGORITHMS[profile.algorithm]) delete profile.algorithm;
+      if (typeof raw.privateKey === 'string' && raw.privateKey.trim()) profile.privateKey = raw.privateKey;
       profiles[name] = profile;
     }
     return profiles;
@@ -463,6 +467,8 @@
     for (const [field, el] of Object.entries(fields)) {
       el.value = profile[field] ?? (field === 'algorithm' ? 'RS256' : '');
     }
+    $('store-private-key').checked = Boolean(profile.privateKey);
+    if (profile.privateKey) $('private-key').value = profile.privateKey;
     $('profile-name').value = name;
   }
 
@@ -475,6 +481,8 @@
     const profiles = loadProfiles();
     profiles[name] = { grant: selectedGrant() };
     for (const [field, el] of Object.entries(fields)) profiles[name][field] = el.value.trim();
+    const privateKey = $('private-key').value;
+    if ($('store-private-key').checked && privateKey.trim()) profiles[name].privateKey = privateKey;
     if (storeProfiles(profiles)) {
       renderProfiles(name);
       setStatus($('profile-status'), `Saved "${name}".`, 'ok');
@@ -493,7 +501,9 @@
   }
 
   function exportProfiles() {
-    const blob = new Blob([JSON.stringify(loadProfiles(), null, 2)], { type: 'application/json' });
+    const profiles = loadProfiles();
+    for (const profile of Object.values(profiles)) delete profile.privateKey;
+    const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'oauth-profiles.json';
@@ -515,7 +525,12 @@
       setStatus(status, 'No profiles found in that file.', 'error');
       return;
     }
-    if (storeProfiles({ ...loadProfiles(), ...imported })) {
+    const profiles = loadProfiles();
+    for (const [name, profile] of Object.entries(imported)) {
+      profiles[name] = { privateKey: profiles[name]?.privateKey, ...profile };
+      if (!profiles[name].privateKey) delete profiles[name].privateKey;
+    }
+    if (storeProfiles(profiles)) {
       renderProfiles($('profile-select').value);
       setStatus(status, `Imported ${count} profile(s).`, 'ok');
     }

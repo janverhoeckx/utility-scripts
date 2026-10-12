@@ -7,7 +7,8 @@ Self-contained HTML versions of the utility scripts, published with GitHub Pages
 Browser version of [client-credentials-grant](../client-credentials-grant) and [token-exchange](../token-exchange). It signs the client assertion with WebCrypto (RS256, RS384 or RS512) and sends the same form parameters as the scripts.
 
 - The private key must be PKCS#8 (`-----BEGIN PRIVATE KEY-----`). Convert a PKCS#1 key with `openssl pkcs8 -topk8 -nocrypt -in key.pem -out key.p8.pem`.
-- The private key and subject token are never stored. Profiles (client id, token url, audiences, scope, algorithm) are saved in the browser's `localStorage` and can be exported/imported as JSON.
+- The subject token is never stored. Profiles (client id, token url, audiences, scope, algorithm) are saved in the browser's `localStorage` and can be exported/imported as JSON.
+- With **Save private key with the profile** checked, saving a profile also stores the private key, unencrypted, in `localStorage`, and selecting that profile fills it in again. Exports never contain private keys; importing a profile keeps a key already stored under the same name.
 - The page loads no external resources; its Content-Security-Policy only allows connections to `https:` URLs.
 
 ### CORS
